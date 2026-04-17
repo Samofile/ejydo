@@ -1,11 +1,73 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Формирование ЖУДО</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">
+                Формирование ЖУДО
+                @if($selectedPolygon)
+                    <span class="badge ms-2 fw-normal" style="background:rgba(255,76,43,0.12);color:#FF4C2B;font-size:0.75rem;">
+                        <i class="bi bi-geo-alt-fill me-1"></i>{{ $selectedPolygon->name }}
+                    </span>
+                @endif
+            </h4>
+        </div>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createJournalModal">
             <i class="bi bi-plus-lg me-1"></i> Сформировать
         </button>
+    </div>
+
+
+    @if($hasPolygons && $polygons->isNotEmpty())
+        <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+            <span class="text-muted small me-1">Полигон:</span>
+            <a href="{{ route('journal.index') }}"
+               class="btn btn-sm {{ !$selectedPolygon ? 'btn-dark' : 'btn-outline-secondary' }}">
+                Все
+            </a>
+            @foreach($polygons as $polygon)
+                <a href="{{ route('journal.index', ['polygon_id' => $polygon->id]) }}"
+                   class="btn btn-sm {{ $selectedPolygon?->id == $polygon->id ? 'btn-primary' : 'btn-outline-primary' }}">
+                    <i class="bi bi-geo-alt me-1"></i>{{ $polygon->name }}
+                </a>
+            @endforeach
+        </div>
+    @endif
+
+
+    @if($hasPolygons)
+        @php
+            $company = app(\App\Services\TenantService::class)->getCompany();
+            $unassigned = $company ? \App\Models\JudoJournal::where('company_id', $company->id)->whereNull('polygon_id')->exists() : false;
+        @endphp
+        @if($unassigned)
+            <div class="alert alert-warning d-flex align-items-start gap-2 mb-4">
+                <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+                <div>
+                    Найдены записи без привязки к полигону. Рекомендуем распределить их по полигонам для более точного учёта.
+                </div>
+            </div>
+        @endif
+    @endif
+
+
+    <div class="card border-0 shadow-sm mb-4" style="border-left: 4px solid #0d6efd !important;">
+        <div class="card-body p-4">
+            <div class="row align-items-center">
+                <div class="col-auto pe-0">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center"
+                         style="width: 56px; height: 56px; background: rgba(13,110,253,0.1);">
+                        <i class="bi bi-info-circle-fill text-primary fs-4"></i>
+                    </div>
+                </div>
+                <div class="col">
+                    <h5 class="mb-1 fw-bold">Формирование ЖУДО</h5>
+                    <p class="text-muted mb-0 small">
+                        В Таблице 1 «О составе отходов» химический состав ваших отходов может отличаться от химического состава из нашего справочника.
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card shadow-sm border-0">
@@ -16,7 +78,9 @@
                         <tr>
                             <th>Период</th>
                             <th>Компания</th>
-
+                            @if($hasPolygons)
+                                <th>Полигон</th>
+                            @endif
                             <th>Дата создания</th>
                             <th>Действия</th>
                         </tr>
@@ -35,7 +99,17 @@
                                     @endif
                                 </td>
                                 <td>{{ $journal->company->name ?? '-' }}</td>
-
+                                @if($hasPolygons)
+                                    <td>
+                                        @if($journal->polygon)
+                                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                                {{ $journal->polygon->name }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    </td>
+                                @endif
                                 <td>{{ $journal->created_at->format('d.m.Y H:i') }}</td>
                                 <td>
                                     <div class="d-flex gap-2">
@@ -57,7 +131,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center text-muted py-5">
+                                <td colspan="{{ $hasPolygons ? 5 : 4 }}" class="text-center text-muted py-5">
                                     <div class="mb-3"><i class="bi bi-journal-text display-4 opacity-50"></i></div>
                                     Журналы еще не сформированы.
                                 </td>
@@ -69,7 +143,7 @@
         </div>
     </div>
 
-    <!-- Create Journal Modal -->
+
     <div class="modal fade" id="createJournalModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -86,10 +160,33 @@
                         <p class="text-muted small mb-4">Выберите отчетный период для формирования журнала. Акты, попадающие
                             в выбранный период, будут автоматически включены в отчет.</p>
 
+
+                        @if($hasPolygons)
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">
+                                    Полигон <span class="text-danger">*</span>
+                                </label>
+                                @if($polygons->isEmpty())
+                                    <div class="alert alert-warning mb-0 py-2">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        Нет активных полигонов. <a href="{{ route('polygons.create') }}">Добавьте полигон</a>.
+                                    </div>
+                                @else
+                                    <select class="form-select" name="polygon_id" required>
+                                        <option value="">— Выберите полигон —</option>
+                                        @foreach($polygons as $polygon)
+                                            <option value="{{ $polygon->id }}">{{ $polygon->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">Журнал будет сформирован для выбранного объекта размещения отходов.</div>
+                                @endif
+                            </div>
+                        @endif
+
                         <div class="card border-0 shadow-sm bg-light">
                             <div class="card-body p-3">
                                 <div class="row g-0">
-                                    <!-- Years -->
+
                                     <div class="col-3 border-end pe-3">
                                         <h6 class="text-uppercase text-secondary fw-bold x-small mb-3 ps-1"
                                             style="font-size: 0.75rem;">
@@ -108,7 +205,7 @@
                                         </div>
                                     </div>
 
-                                    <!-- Quarters -->
+
                                     <div class="col-4 border-end px-3">
                                         <h6 class="text-uppercase text-secondary fw-bold x-small mb-3 ps-1"
                                             style="font-size: 0.75rem;">
@@ -127,7 +224,7 @@
                                         </div>
                                     </div>
 
-                                    <!-- Months -->
+
                                     <div class="col-5 ps-3">
                                         <h6 class="text-uppercase text-secondary fw-bold x-small mb-3 ps-1"
                                             style="font-size: 0.75rem;">

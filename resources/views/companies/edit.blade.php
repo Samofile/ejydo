@@ -21,10 +21,8 @@
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <label class="form-label">Тип организации <span class="text-danger">*</span></label>
-                                <select class="form-select" name="type" id="type-select" required>
-                                    <option value="ООО" {{ $company->type == 'ООО' ? 'selected' : '' }}>ООО</option>
-                                    <option value="ИП" {{ $company->type == 'ИП' ? 'selected' : '' }}>ИП</option>
-                                </select>
+                                <input type="text" class="form-control" name="type" id="type-input" value="{{ $company->type }}"
+                                    placeholder="ООО, ИП, МУП и другие" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Наименование <span class="text-danger">*</span></label>
@@ -33,8 +31,13 @@
 
                             <div class="col-md-6">
                                 <label class="form-label">ИНН <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="inn" value="{{ $company->inn }}"
-                                    minlength="10" maxlength="12" required>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" name="inn" id="inn-field" value="{{ $company->inn }}"
+                                        minlength="10" maxlength="12" required>
+                                    <button class="btn btn-outline-primary" type="button" id="btn-find-inn" title="Обновить информацию через Checko">
+                                        <i class="bi bi-search"></i> Найти
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="col-md-6" id="kpp-group">
@@ -61,6 +64,47 @@
                             <label class="form-label">Фактический адрес</label>
                             <input type="text" class="form-control" name="actual_address"
                                 value="{{ $company->actual_address }}">
+                        </div>
+
+                        <h6 class="fw-bold mb-3 border-bottom pb-2">Лицензия на обращение с отходами</h6>
+                        <div class="row">
+                            <div class="col-md-9 mb-3">
+                                <label class="form-label">Реквизиты лицензии</label>
+                                <input type="text" class="form-control @error('license_details') is-invalid @enderror"
+                                    name="license_details" value="{{ old('license_details', $company->license_details) }}"
+                                    placeholder="Номер лицензии, дата выдачи, орган">
+                                @error('license_details') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <label class="form-label mb-0">Срок действия</label>
+                                    <div class="form-check mb-0 ms-2">
+                                        @php
+                                            $isIndefinite = old('license_indefinite',
+                                                ($company->license_valid_until === 'бессрочная') ? '1' : null
+                                            );
+                                        @endphp
+                                        <input class="form-check-input" type="checkbox" id="license-indefinite-edit"
+                                            name="license_indefinite" value="1"
+                                            {{ $isIndefinite ? 'checked' : '' }}>
+                                        <label class="form-check-label small" for="license-indefinite-edit">Бессрочная</label>
+                                    </div>
+                                </div>
+                                @php
+                                    $dateValue = ($company->license_valid_until && $company->license_valid_until !== 'бессрочная')
+                                        ? \Carbon\Carbon::parse($company->license_valid_until)->format('Y-m-d')
+                                        : null;
+                                @endphp
+                                <input type="date" class="form-control @error('license_valid_until') is-invalid @enderror"
+                                    id="license-valid-until-edit"
+                                    name="license_valid_until"
+                                    value="{{ old('license_valid_until', $dateValue) }}"
+                                    {{ $isIndefinite ? 'disabled' : '' }}>
+                                @error('license_valid_until') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-12 mb-4">
+                                <div class="form-text">Используется в Таблице 3, ст. 14 ЖУДО.</div>
+                            </div>
                         </div>
 
                         <h6 class="fw-bold mb-3 border-bottom pb-2">Контактные данные</h6>
@@ -93,12 +137,15 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const typeSelect = document.getElementById('type-select');
+            const typeInput = document.getElementById('type-input');
             const kppInput = document.querySelector('input[name="kpp"]');
             const kppAsterisk = document.getElementById('kpp-asterisk');
+            const innInput = document.getElementById('inn-field');
+            const btnFind = document.getElementById('btn-find-inn');
 
             function updateKpp() {
-                if (typeSelect.value === 'ИП') {
+                const val = typeInput.value.trim().toUpperCase();
+                if (val === 'ИП' || val.includes('ИНДИВИДУАЛЬНЫЙ')) {
                     kppInput.removeAttribute('required');
                     kppAsterisk.classList.add('d-none');
                 } else {
@@ -107,8 +154,80 @@
                 }
             }
 
-            typeSelect.addEventListener('change', updateKpp);
+            typeInput.addEventListener('input', updateKpp);
             updateKpp();
+
+
+            const indefiniteCheckbox = document.getElementById('license-indefinite-edit');
+            const licenseValidUntil = document.getElementById('license-valid-until-edit');
+
+            function toggleLicenseDate() {
+                if (indefiniteCheckbox.checked) {
+                    licenseValidUntil.disabled = true;
+                    licenseValidUntil.value = '';
+                } else {
+                    licenseValidUntil.disabled = false;
+                }
+            }
+
+            indefiniteCheckbox.addEventListener('change', toggleLicenseDate);
+            toggleLicenseDate();
+
+            btnFind.addEventListener('click', async function() {
+                const inn = innInput.value.trim();
+                if (!inn) {
+                    alert('Пожалуйста, введите ИНН');
+                    return;
+                }
+
+                const originalHtml = btnFind.innerHTML;
+                btnFind.disabled = true;
+                btnFind.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
+                try {
+                    const response = await fetch(`{{ route('checko.inn') }}?inn=${inn}`);
+                    if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error || 'Ошибка при поиске');
+                    }
+
+                    const data = await response.json();
+
+                    if (data.name) {
+                        document.querySelector('input[name="name"]').value = data.name;
+                        document.querySelector('input[name="type"]').value = data.type || '';
+                        document.querySelector('input[name="kpp"]').value = data.kpp || '';
+                        document.querySelector('input[name="ogrn"]').value = data.ogrn || '';
+                        document.querySelector('input[name="legal_address"]').value = data.address || '';
+                        if (data.license_details) {
+                            document.querySelector('input[name="license_details"]').value = data.license_details;
+                        }
+                        if (data.license_valid_until) {
+                            document.querySelector('input[name="license_valid_until"]').value = data.license_valid_until;
+                        }
+                        if (data.contact_person) {
+                            document.querySelector('input[name="contact_person"]').value = data.contact_person;
+                        }
+                        if (data.phone) {
+                            document.querySelector('input[name="phone"]').value = data.phone;
+                        }
+                        if (data.email) {
+                            document.querySelector('input[name="email"]').value = data.email;
+                        }
+
+                        updateKpp();
+                        alert('Данные успешно обновлены!');
+                    } else {
+                        alert('Организация не найдена');
+                    }
+                } catch (error) {
+                    console.error('Checko Lookup Error:', error);
+                    alert('Ошибка: ' + error.message);
+                } finally {
+                    btnFind.disabled = false;
+                    btnFind.innerHTML = originalHtml;
+                }
+            });
         });
     </script>
 @endsection

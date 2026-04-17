@@ -17,6 +17,9 @@
                         <form action="{{ route('journal.initial-balance.store') }}" method="POST">
                             @csrf
                             <input type="hidden" name="period" value="{{ $period }}">
+                            @if(!empty($polygonId))
+                                <input type="hidden" name="polygon_id" value="{{ $polygonId }}">
+                            @endif
 
                             <div id="wastes-container">
                                 <!-- Existing rows will be added here -->
@@ -28,11 +31,12 @@
                                 </button>
                             </div>
 
-                            <div class="d-flex justify-content-end border-top pt-3">
+                            <div class="d-flex justify-content-end border-top pt-3 text-nowrap">
                                 <a href="{{ route('journal.index') }}" class="btn btn-light me-2">Отмена</a>
-                                <button type="submit" class="btn btn-dark me-2"
+                                <button type="submit" class="btn me-2" 
+                                    style="background-color: #FF4C2B; border-color: #FF4C2B; color: white;"
                                     onclick="clearWastesAndSubmit(event)">Продолжить без ввода остатков</button>
-                                <button type="submit" class="btn btn-primary px-4">Сохранить и продолжить</button>
+                                <button type="submit" class="btn btn-dark px-4">Сохранить и продолжить</button>
                             </div>
                         </form>
                     </div>
@@ -133,24 +137,31 @@
                                 results.innerHTML = '';
                                 if (data.length > 0) {
                                     data.forEach(item => {
+                                        let fCode = item.code;
+                                        let cleanCode = (fCode || '').replace(/\s+/g, '');
+                                        if (cleanCode.length === 11) {
+                                            fCode = cleanCode.substring(0,1) + ' ' + cleanCode.substring(1,3) + ' ' + 
+                                                    cleanCode.substring(3,6) + ' ' + cleanCode.substring(6,8) + ' ' + 
+                                                    cleanCode.substring(8,10) + ' ' + cleanCode.substring(10,11);
+                                        }
                                         const a = document.createElement('a');
                                         a.href = '#';
                                         a.className = 'list-group-item list-group-item-action py-2';
                                         a.innerHTML = `
                                                             <div class="d-flex justify-content-between">
                                                                 <span class="fw-medium text-wrap" style="font-size:0.9em;">${item.name}</span>
-                                                                <span class="badge bg-secondary ms-2 align-self-start">${item.code}</span>
+                                                                <span class="badge bg-secondary ms-2 align-self-start">${fCode}</span>
                                                             </div>
                                                         `;
                                         a.onclick = (e) => {
                                             e.preventDefault();
 
                                             hiddenName.value = item.name;
-                                            hiddenFkko.value = item.code;
+                                            hiddenFkko.value = fCode;
                                             hiddenHazard.value = item.hazard_class;
 
                                             dispName.textContent = item.name;
-                                            dispFkko.textContent = item.code;
+                                            dispFkko.textContent = fCode;
                                             dispHazard.textContent = item.hazard_class;
                                             infoBlock.style.display = 'block';
 

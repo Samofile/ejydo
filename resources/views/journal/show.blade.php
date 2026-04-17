@@ -17,16 +17,59 @@
             $endDate = $periodDate->copy()->endOfYear();
         }
     @endphp
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h4 class="mb-0">Журнал учета движения отходов</h4>
             <p class="text-muted mb-0">
                 Период: {{ $periodStr }} |
                 Компания: {{ $journal->company->name ?? '-' }}
+                @if($hasPolygons && $journal->polygon)
+                    | <span class="text-primary"><i class="bi bi-geo-alt-fill me-1"></i>{{ $journal->polygon->name }}</span>
+                @endif
             </p>
         </div>
-        <div class="d-flex align-items-center">
-            <a href="{{ route('journal.index') }}" class="btn btn-outline-secondary me-3">Назад</a>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ route('journal.index') }}" class="btn btn-outline-secondary">Назад</a>
+
+            @if($hasPolygons)
+                <div class="dropdown">
+                    <button class="btn {{ $journal->polygon ? 'btn-outline-primary' : 'btn-outline-secondary' }} dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-geo-alt me-1"></i>
+                        {{ $journal->polygon ? $journal->polygon->name : 'Полигон не выбран' }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width: 220px;">
+                        <li><h6 class="dropdown-header">Привязать к полигону</h6></li>
+                        @foreach($polygons as $polygon)
+                            <li>
+                                <form action="{{ route('journal.assign-polygon', $journal->id) }}" method="POST">
+                                    @csrf @method('PATCH')
+                                    <input type="hidden" name="polygon_id" value="{{ $polygon->id }}">
+                                    <button type="submit"
+                                        class="dropdown-item {{ $journal->polygon_id == $polygon->id ? 'fw-bold text-primary' : '' }}">
+                                        <i class="bi bi-geo-alt{{ $journal->polygon_id == $polygon->id ? '-fill text-primary' : '' }} me-1"></i>
+                                        {{ $polygon->name }}
+                                        @if($journal->polygon_id == $polygon->id)
+                                            <i class="bi bi-check2 ms-1 text-success"></i>
+                                        @endif
+                                    </button>
+                                </form>
+                            </li>
+                        @endforeach
+                        @if($journal->polygon_id)
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                                <form action="{{ route('journal.assign-polygon', $journal->id) }}" method="POST">
+                                    @csrf @method('PATCH')
+                                    <input type="hidden" name="polygon_id" value="">
+                                    <button type="submit" class="dropdown-item text-muted">
+                                        <i class="bi bi-x-circle me-1"></i>Снять привязку
+                                    </button>
+                                </form>
+                            </li>
+                        @endif
+                    </ul>
+                </div>
+            @endif
             <div class="d-flex" style="gap: 10px;">
                 <a href="{{ route('journal.download', $journal->id) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i> Скачать Excel</a>
                 <a href="{{ route('journal.download-pdf', $journal->id) }}" class="btn btn-danger"><i class="bi bi-file-earmark-pdf me-1"></i> Скачать PDF</a>
@@ -45,175 +88,216 @@
                     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#sheet1">Титульный лист</button>
                 </li>
                 <li class="nav-item">
-                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet-app1">Пр. 1 (Состав)</button>
+                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet-app1">Таблица 1 (Состав)</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet2">Пр. 2 (Обобщенные)</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet2">Таблица 2 (Обобщённые)</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet3">Пр. 3 (Переданные)</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet3">Таблица 3 (Переданные)</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet4">Пр. 4 (Полученные)</button>
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sheet4">Таблица 4 (Полученные)</button>
                 </li>
             </ul>
         </div>
         <div class="card-body p-4">
             <div class="tab-content">
 
-                <!-- Titular -->
+
                 <div class="tab-pane fade show active" id="sheet1">
-                    <div class="bg-white p-5 mx-auto shadow-sm" style="max-width: 210mm; min-height: 297mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif;">
+                    <div class="bg-white p-5 mx-auto shadow-sm" style="max-width: 210mm; min-height: 297mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif; line-height: 1.3;">
                         
+
+                        <div class="row">
+                            <div class="col-5"></div>
+                            <div class="col-7 text-start">
+                                 <div class="fw-bold mb-1">УТВЕРЖДАЮ</div>
+                                 <div class="mb-3">Генеральный директор {{ $journal->company->name ?? 'ООО "Эко Полимер"' }}</div>
+                                 <div class="mt-4 pt-1">
+                                     <table class="w-100" style="border-collapse: collapse;">
+                                         <tr>
+                                             <td class="border-bottom border-dark text-center" style="width: 40%; height: 1.5em;"></td>
+                                             <td style="width: 10%;"></td>
+                                             <td class="border-bottom border-dark text-center fw-bold" style="width: 50%;">{{ $journal->company->contact_person ?? '' }}</td>
+                                         </tr>
+                                         <tr>
+                                             <td class="text-center" style="font-size: 7.5pt; vertical-align: top;">(подпись)</td>
+                                             <td></td>
+                                             <td class="text-center" style="font-size: 7.5pt; vertical-align: top;">(Ф.И.О.)</td>
+                                         </tr>
+                                     </table>
+                                 </div>
+                                 @php
+                                     $monthsGenitive = [
+                                         1 => 'января', 2 => 'февраля', 3 => 'марта', 4 => 'апреля',
+                                         5 => 'мая', 6 => 'июня', 7 => 'июля', 8 => 'августа',
+                                         9 => 'сентября', 10 => 'октября', 11 => 'ноября', 12 => 'декабря'
+                                     ];
+                                     $currentMonthRus = $monthsGenitive[(int)date('n')];
+                                 @endphp
+                                 <div class="mt-3">&laquo; {{ date('d') }} &raquo; {{ $currentMonthRus }} {{ date('Y') }} г.</div>
+                            </div>
+                        </div>
+
+
+                        <div class="text-center mt-5 mb-5 pt-5">
+                            <h2 class="fw-bold mb-0" style="font-size: 18pt;">Журнал учета движения отходов</h2>
+                        </div>
+
+
+                        <div class="text-center mt-4 pt-5">
+                            <div class="border-bottom border-dark fw-bold mb-1" style="min-height: 1.5em; line-height: 1.2;">{{ $journal->company->name ?? '' }}</div>
+                            <div class="small" style="font-size: 8pt;">(наименование объекта, оказывающего негативное воздействие на окружающую среду)</div>
+                        </div>
+
                         <div class="text-center mt-4">
-                            <h2 class="fw-bold text-uppercase mb-2">ЖУРНАЛ УЧЕТА ДВИЖЕНИЯ ОТХОДОВ</h2>
-                            <div class="fs-5 mb-0">за <u>{{ $periodStr }}</u></div>
-                            <div class="small text-muted mb-3">(месяц, год)</div>
-                            
-                            <div class="mb-4">
-                                {{ $startDate->format('d.m.Y') }} - {{ $endDate->format('d.m.Y') }}
-                            </div>
-                            <div class="small text-muted" style="margin-top: -1.5rem;">(дата начала ведения журнала) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (дата окончания ведения журнала)</div>
+                            <div class="border-bottom border-dark mb-1" style="min-height: 1.5em;">&nbsp;</div>
+                            <div class="small" style="font-size: 8pt;">(категория объекта)</div>
                         </div>
 
-                        <div class="mt-5">
-                            <!-- Name -->
-                            <div class="mb-2">
-                                <div>Наименование индивидуального предпринимателя или юридического лица:</div>
-                                <div class="border-bottom border-dark text-center fw-bold text-nowrap" style="line-height: 1.5;">
-                                    {{ $journal->company->full_formal_name ?? '' }}
-                                </div>
-                            </div>
 
+                        <div class="text-center mt-5 pt-4">
+                            <div class="border-bottom border-dark fw-bold mb-1" style="min-height: 1.5em; line-height: 1.2;">{{ $journal->company->contact_person ?? '' }}</div>
+                            <div class="small" style="font-size: 8pt;">(наименование юридического лица, индивидуального предпринимателя)</div>
+                        </div>
+
+
+                        <div class="mt-5 pt-5">
+                            <div class="d-flex align-items-center mb-4">
+                                <div class="me-3" style="width: 80px;">начат</div>
+                                <div class="border-bottom border-dark flex-grow-1 text-center fw-bold">{{ $startDate->format('d.m.Y') }}</div>
+                            </div>
+                            <div class="d-flex align-items-center mb-4">
+                                <div class="me-3" style="width: 80px;">окончен</div>
+                                <div class="border-bottom border-dark flex-grow-1 text-center fw-bold">{{ $endDate->format('d.m.Y') }}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- App 1: Composition (Table 1) -->
+
                 <div class="tab-pane fade" id="sheet-app1">
-                    <div class="bg-white p-4 mx-auto shadow-sm" style="max-width: 297mm; min-height: 210mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif;">
-                         <div class="table-responsive">
-                             <table class="table table-bordered table-sm text-center align-middle caption-top" style="font-size: 0.9rem; border-color: #000;">
-                                <caption style="color: #000; font-weight: bold;">Данные о видах отходов (Пр. 1)</caption>
-                                <thead class="table-light">
+                    <div class="bg-white p-3" style="color: #000; font-family: 'Times New Roman', serif;">
+                        <table class="table table-bordered table-sm text-center align-middle caption-top" style="font-size: 0.85rem; border-color: #000; width: 100%; table-layout: fixed;">
+                            <caption style="color: #000; font-weight: bold;">Данные о видах отходов (Таблица 1)</caption>
+                            <colgroup>
+                                <col style="width: 3%;">
+                                <col style="width: 28%;">
+                                <col style="width: 145px;">
+                                <col style="width: 7%;">
+                                <col>
+                                <col>
+                                <col>
+                            </colgroup>
+                             <thead class="table-light">
+                                <tr>
+                                    <th>№ п/п</th>
+                                    <th>Наименование вида отхода</th>
+                                    <th style="white-space:nowrap;">Код по ФККО</th>
+                                    <th>Класс опасности</th>
+                                    <th>Происхождение или условия<br>образования вида отхода</th>
+                                    <th>Агрегатное состояние и<br>физическая форма</th>
+                                    <th>Химический и (или)<br>компонентный состав, %</th>
+                                </tr>
+                                <tr class="text-muted small">
+                                    <th>1</th>
+                                    <th>2</th>
+                                    <th>3</th>
+                                    <th>4</th>
+                                    <th>5</th>
+                                    <th>6</th>
+                                    <th>7</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @php $row=1; @endphp
+                                @forelse($journal->table1_data as $item)
                                     <tr>
-                                        <th>№ п/п</th>
-                                        <th>Наименование вида отхода</th>
-                                        <th>Код по ФККО</th>
-                                        <th>Класс опасности</th>
-                                        <th>Происхождение/Условия образования</th>
-                                        <th>Хим. состав</th>
-                                        <th>Агрегатное состояние</th>
+                                        <td>{{ $row++ }}</td>
+                                        <td class="text-start" style="word-break:break-word;">{{ $item['name'] }}</td>
+                                        <td style="white-space:nowrap;">{{ $item['fkko'] }}</td>
+                                        <td>{{ $item['hazard'] }}</td>
+                                        <td class="text-start" style="word-break:break-word;">{{ $item['origin'] ?? '-' }}</td>
+                                        <td class="text-start" style="word-break:break-word;">{{ $item['aggregate_state'] ?? '-' }}</td>
+                                        <td class="text-start" style="word-break:break-word;">{{ $item['chemical_composition'] ?? '-' }}</td>
                                     </tr>
-                                    <tr>
-                                        <th class="text-muted">1</th>
-                                        <th class="text-muted">2</th>
-                                        <th class="text-muted">3</th>
-                                        <th class="text-muted">4</th>
-                                        <th class="text-muted">5</th>
-                                        <th class="text-muted">6</th>
-                                        <th class="text-muted">7</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @php $row=1; @endphp
-                                    @forelse($journal->table1_data as $item)
-                                        <tr>
-                                            <td>{{ $row++ }}</td>
-                                            <td class="text-start">{{ $item['name'] }}</td>
-                                            <td>{{ $item['fkko'] }}</td>
-                                            <td>{{ $item['hazard'] }}</td>
-                                            <td></td>
-                                            <td></td>
-                                            <td></td>
-                                        </tr>
-                                    @empty
-                                        <tr><td colspan="7">Нет данных</td></tr>
-                                    @endforelse
-                                </tbody>
-                             </table>
-                        </div>
+                                @empty
+                                    <tr><td colspan="7">Нет данных</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <!-- App 2: Summary (Table 2) -->
+
                 <div class="tab-pane fade" id="sheet2">
-                    <div class="bg-white p-4 mx-auto shadow-sm" style="max-width: 297mm; min-height: 210mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif;">
+                    <div class="p-2">
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm text-center align-middle caption-top"
-                                style="font-size: 0.85rem; border-color: #000;">
-                                <caption style="color: #000; font-weight: bold;">Обобщенные данные (Таблица 2)</caption>
+                                style="font-size: 0.72rem; border-color: #999; width: 100%; font-family: 'Times New Roman', serif;">
+                                <caption style="color: #000; font-weight: bold; font-size: 0.85rem;">Обобщенные данные (Таблица 2)</caption>
                                 <thead class="table-light">
                                     <tr>
-                                        <th rowspan="2">№</th>
-                                        <th rowspan="2">Наименование отхода</th>
-                                        <th rowspan="2">Код ФККО</th>
+                                        <th rowspan="2" style="min-width:28px;">№</th>
+                                        <th rowspan="2" style="min-width:120px; max-width:160px;">Наименование</th>
+                                        <th rowspan="2" style="white-space:nowrap; min-width:140px;">ФККО</th>
                                         <th rowspan="2">Класс</th>
-                                        <th rowspan="2">Наличие на начало (т)</th>
-                                        <th rowspan="2">Образовано (т)</th>
-                                        <th rowspan="2">Получено (т)</th>
-                                        <th rowspan="2">Утилизировано (т)</th>
-                                        <th rowspan="2">Обезврежено (т)</th>
-                                        <th colspan="5">Передано другим лицам (т)</th>
-                                        <th colspan="2">Размещено (т)</th>
-                                        <th rowspan="2">Наличие на конец (т)</th>
+                                        <th colspan="2">На начало, т</th>
+                                        <th rowspan="2">Образовано, т</th>
+                                        <th rowspan="2">Получено, т</th>
+                                        <th rowspan="2">Обработано, т</th>
+                                        <th rowspan="2">Утилизовано, т</th>
+                                        <th rowspan="2">Обезврежено, т</th>
+                                        <th rowspan="2">Передано, т</th>
+                                        <th colspan="3">Размещено, т</th>
+                                        <th colspan="2">На конец, т</th>
                                     </tr>
                                     <tr>
+                                        <th>Хран.</th>
+                                        <th>Накоп.</th>
                                         <th>Всего</th>
-                                        <th>Для обраб.</th>
-                                        <th>Для утил.</th>
-                                        <th>Для обезвр.</th>
-                                        <th>Для разм.</th>
-                                        <th>Хранение</th>
+                                        <th>Хран.</th>
                                         <th>Захор.</th>
+                                        <th>Хран.</th>
+                                        <th>Накоп.</th>
                                     </tr>
-                                    <tr>
-                                        <th class="text-muted">1</th>
-                                        <th class="text-muted">2</th>
-                                        <th class="text-muted">3</th>
-                                        <th class="text-muted">4</th>
-                                        <th class="text-muted">5</th>
-                                        <th class="text-muted">6</th>
-                                        <th class="text-muted">7</th>
-                                        <th class="text-muted">8</th>
-                                        <th class="text-muted">9</th>
-                                        <th class="text-muted">10</th>
-                                        <th class="text-muted">11</th>
-                                        <th class="text-muted">12</th>
-                                        <th class="text-muted">13</th>
-                                        <th class="text-muted">14</th>
-                                        <th class="text-muted">15</th>
-                                        <th class="text-muted">16</th>
-                                        <th class="text-muted">17</th>
+                                    <tr class="text-muted" style="font-size: 0.62rem;">
+                                        <th>А</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @php $row = 1; @endphp
                                     @forelse($journal->table2_data as $item)
+                                        @php
+                                            $start_storage = $item['start_storage'] ?? 0;
+                                            $start_accumulation = $item['start_accumulation'] ?? $item['balance_begin'] ?? 0;
+                                            $placed_total = ($item['stored'] ?? 0) + ($item['buried'] ?? 0);
+                                            $end_storage = $item['end_storage'] ?? 0;
+                                            $end_accumulation = $item['end_accumulation'] ?? $item['balance_end'] ?? 0;
+                                            $fmt = fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.') ?: '0';
+                                        @endphp
                                         <tr>
-                                            <td>{{ $row++ }}</td>
-                                            <td class="text-start">{{ $item['name'] }}</td>
-                                            <td>{{ $item['fkko'] }}</td>
-                                            <td>{{ $item['hazard'] }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['balance_begin'], 3), '0'), '.') }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['generated'], 3), '0'), '.') }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['received'], 3), '0'), '.') }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['utilized'] ?? 0, 3), '0'), '.') }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['neutralized'] ?? 0, 3), '0'), '.') }}</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['transferred'], 3), '0'), '.') }}</td>
-                                            <td>-</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['transferred'], 3), '0'), '.') }}</td>
-                                            <td>-</td>
-                                            <td>-</td>
-                                            <td>-</td>
-                                            <td>{{ rtrim(rtrim(number_format($item['buried'] ?? 0, 3), '0'), '.') }}</td>
-                                            <td><strong>{{ rtrim(rtrim(number_format($item['balance_end'], 3), '0'), '.') }}</strong>
-                                            </td>
+                                            <td style="white-space:nowrap;">{{ $row++ }}</td>
+                                            <td class="text-start" title="{{ $item['name'] }}">{{ $item['name'] }}</td>
+                                            <td style="white-space:nowrap;">{{ $item['fkko'] }}</td>
+                                            <td style="white-space:nowrap;">{{ $item['hazard'] }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($start_storage) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($start_accumulation) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['generated'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['received'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['processed'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['utilized'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['neutralized'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['transferred_total'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($placed_total) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['stored'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($item['buried'] ?? 0) }}</td>
+                                            <td style="white-space:nowrap;">{{ $fmt($end_storage) }}</td>
+                                            <td class="fw-bold" style="white-space:nowrap;">{{ $fmt($end_accumulation) }}</td>
                                         </tr>
                                     @empty
-                                        <tr>
-                                            <td colspan="17">Нет данных</td>
-                                        </tr>
+                                        <tr><td colspan="17">Нет данных</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -221,379 +305,147 @@
                     </div>
                 </div>
 
-                <!-- App 3: Transferred -->
                 <div class="tab-pane fade" id="sheet3">
-                    <div class="bg-white p-4 mx-auto shadow-sm" style="max-width: 297mm; min-height: 210mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif;">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-sm text-center align-middle caption-top"
-                                style="font-size: 0.85rem; border-color: #000;">
-                                <caption style="color: #000; font-weight: bold;">Данные о переданных другим лицам отходах (Таблица 3)</caption>
-                                <thead class="table-light">
+                    <div class="bg-white p-3" style="color: #000; font-family: 'Times New Roman', serif;">
+                        <table class="table table-bordered table-sm text-center align-middle caption-top" style="font-size: 0.78rem; border-color: #000; width: 100%; table-layout: fixed;">
+                            <caption style="color: #000; font-weight: bold;">Передано (Таблица 3)</caption>
+                            <colgroup>
+                                <col style="width: 2.5%;">
+                                <col style="width: 15%;">
+                                <col style="width: 145px;">
+                                <col style="width: 4%;">
+                                <col style="width: 4.5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 13%;">
+                                <col style="width: 10%;">
+                                <col style="width: 7%;">
+                                <col style="width: 9%;">
+                            </colgroup>
+                            <thead class="table-light">
+                                <tr>
+                                    <th rowspan="2">N п/п</th>
+                                    <th rowspan="2">Наименование вида отхода</th>
+                                    <th rowspan="2" style="white-space:nowrap;">Код по ФККО</th>
+                                    <th rowspan="2">Класс опасности</th>
+                                    <th colspan="6">Количество переданных отходов за отчетный период, тонн</th>
+                                    <th rowspan="2">Сведения о лицах, которым переданы отходы</th>
+                                    <th rowspan="2">Дата и номер договора</th>
+                                    <th rowspan="2">Срок действия договора</th>
+                                    <th rowspan="2">Реквизиты лицензии</th>
+                                </tr>
+                                <tr>
+                                    <th>всего</th>
+                                    <th>для обработки</th>
+                                    <th>для утил.</th>
+                                    <th>для обезвр.</th>
+                                    <th>для хран.</th>
+                                    <th>для захор.</th>
+                                </tr>
+                                <tr class="text-muted" style="font-size: 0.65rem;">
+                                    <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($journal->table3_data as $item)
                                     <tr>
-                                        <th rowspan="2">№</th>
-                                        <th rowspan="2">Дата</th>
-                                        <th rowspan="2">Номер акта</th>
-                                        <th rowspan="2">Наименование отхода</th>
-                                        <th rowspan="2">Код ФККО</th>
-                                        <th rowspan="2">Класс</th>
-                                        <th rowspan="2">Контрагент (Получатель)</th>
-                                        <th rowspan="2">Количество (т)</th>
-                                        <th class="text-nowrap" colspan="5">Цель передачи</th>
+                                        <td>{{ $loop->iteration }}</td>
+                                        <td class="text-start" style="word-break:break-word;" title="{{ $item['waste'] }}">{{ $item['waste'] }}</td>
+                                        <td style="white-space:nowrap;">{{ $item['fkko'] }}</td>
+                                        <td>{{ $item['hazard'] }}</td>
+                                        <td class="fw-bold">{{ rtrim(rtrim(number_format($item['amount'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_process'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_util'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_neutr'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_store'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_bury'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td class="text-start" style="word-break:break-word;" title="{{ $item['counterparty'] }}">{{ $item['counterparty'] }}</td>
+                                        <td style="word-break:break-word;">{{ $item['contract_details'] ?? '' }}</td>
+                                        <td>{{ $item['contract_validity'] ?? '' }}</td>
+                                        <td style="word-break:break-word;">{{ $item['license'] ?? '' }}</td>
                                     </tr>
-                                    <tr>
-                                        <th>Обраб.</th>
-                                        <th>Утил.</th>
-                                        <th>Обезвр.</th>
-                                        <th>Хран.</th>
-                                        <th>Захор.</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @php $row = 1;
-                                    $totalTrans = 0; @endphp
-                                    @forelse($journal->table3_data as $index => $item)
-                                        @php $totalTrans += (float) $item['amount']; @endphp
-                                        <tr>
-                                            <td class="position-relative">
-                                                <span class="row-number">{{ $loop->iteration }}</span>
-                                                <button class="btn btn-sm btn-dark text-white p-0 border-0 delete-row-btn position-absolute top-50 start-50 translate-middle"
-                                                        style="display: none; width: 24px; height: 24px; z-index: 100;"
-                                                        title="Удалить строку"
-                                                        data-table="table3_data"
-                                                        data-row="{{ $index }}">
-                                                    <i class="bi bi-trash text-white"></i>
-                                                </button>
-                                            </td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="date">{{ \Carbon\Carbon::parse($item['date'])->format('d.m.Y') }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="number">{{ $item['number'] }}</td>
-                                            <td class="editable text-start" data-table="table3_data" data-row="{{ $index }}" data-column="waste">{{ $item['waste'] }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="fkko">{{ $item['fkko'] }}</td>
-                                            <td data-table="table3_data" data-row="{{ $index }}" data-column="hazard">{{ $item['hazard'] }}</td>
-                                            <td class="editable text-start" data-table="table3_data" data-row="{{ $index }}" data-column="counterparty">{{ $item['counterparty'] }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="amount"><strong>{{ rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') }}</strong></td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="p_process">{{ $item['p_process'] ?? (str_contains($item['operation']??'', 'обраб') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="p_util">{{ $item['p_util'] ?? (str_contains($item['operation']??'', 'утилиз') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="p_neutr">{{ $item['p_neutr'] ?? (str_contains($item['operation']??'', 'обезвреж') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="p_store">{{ $item['p_store'] ?? (str_contains($item['operation']??'', 'хран') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table3_data" data-row="{{ $index }}" data-column="p_bury">{{ $item['p_bury'] ?? (str_contains($item['operation']??'', 'захор') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="14">Нет данных</td>
-                                        </tr>
-                                    @endforelse
-                                    @if(count($journal->table3_data) > 0)
-                                        <tr class="fw-bold bg-light">
-                                            <td colspan="7" class="text-end">Итого:</td>
-                                            <td id="total-table3_data">{{ rtrim(rtrim(number_format($totalTrans, 3), '0'), '.') }}</td>
-                                            <td colspan="5"></td>
-                                        </tr>
-                                    @endif
-                                </tbody>
-                            </table>
-                        </div>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <!-- App 4: Received -->
+
                 <div class="tab-pane fade" id="sheet4">
-                    <div class="bg-white p-4 mx-auto shadow-sm" style="max-width: 297mm; min-height: 210mm; border: 1px solid #dee2e6; color: #000; font-family: 'Times New Roman', serif;">
-                        <div class="table-responsive">
-                             <table class="table table-bordered table-sm text-center align-middle caption-top" style="font-size: 0.85rem; border-color: #000;">
-                                <caption style="color: #000; font-weight: bold;">Данные о полученных отходах (Таблица 4)</caption>
-                                <thead class="table-light">
+                    <div class="bg-white p-3" style="color: #000; font-family: 'Times New Roman', serif;">
+                        <table class="table table-bordered table-sm text-center align-middle caption-top" style="font-size: 0.78rem; border-color: #000; width: 100%; table-layout: fixed;">
+                            <caption style="color: #000; font-weight: bold;">Получено (Таблица 4)</caption>
+                            <colgroup>
+                                <col style="width: 2.5%;">
+                                <col style="width: 15%;">
+                                <col style="width: 145px;">
+                                <col style="width: 4%;">
+                                <col style="width: 4.5%;">
+                                <col style="width: 8%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 5%;">
+                                <col style="width: 13%;">
+                                <col style="width: 10%;">
+                                <col style="width: 7%;">
+                            </colgroup>
+                            <thead class="table-light">
+                                <tr>
+                                    <th rowspan="3">N п/п</th>
+                                    <th rowspan="3">Наименование вида отхода</th>
+                                    <th rowspan="3" style="white-space:nowrap;">Код по ФККО</th>
+                                    <th rowspan="3">Класс опасности</th>
+                                    <th colspan="7">Количество полученных отходов, тонн</th>
+                                    <th rowspan="3">Сведения о лицах, от которых получены отходы</th>
+                                    <th rowspan="3">Дата и номер договора</th>
+                                    <th rowspan="3">Срок действия договора</th>
+                                </tr>
+                                <tr>
+                                    <th rowspan="2">всего</th>
+                                    <th colspan="6">в том числе</th>
+                                </tr>
+                                <tr>
+                                    <th>для накопл. и передачи</th>
+                                    <th>для обраб.</th>
+                                    <th>для утил.</th>
+                                    <th>для обезвр.</th>
+                                    <th>для хран.</th>
+                                    <th>для захор.</th>
+                                </tr>
+                                <tr class="text-muted" style="font-size: 0.65rem;">
+                                    <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($journal->table4_data as $item)
                                     <tr>
-                                        <th rowspan="2">№</th>
-                                        <th rowspan="2">Дата</th>
-                                        <th rowspan="2">Номер акта</th>
-                                        <th rowspan="2">Наименование отхода</th>
-                                        <th rowspan="2">Код ФККО</th>
-                                        <th rowspan="2">Класс</th>
-                                        <th rowspan="2">Контрагент (Поставщик)</th>
-                                        <th rowspan="2">Количество (т)</th>
-                                        <th class="text-nowrap" colspan="3">Цель приема</th>
+                                        <td>{{ $loop->iteration }}</td>
+                                        <td class="text-start" style="word-break:break-word;">{{ $item['waste'] }}</td>
+                                        <td style="white-space:nowrap;">{{ $item['fkko'] }}</td>
+                                        <td>{{ $item['hazard'] }}</td>
+                                        <td class="fw-bold">{{ rtrim(rtrim(number_format($item['amount'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_third_party'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_process'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_util'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_neutr'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_store'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format($item['amt_bury'] ?? 0, 3), '0'), '.') }}</td>
+                                        <td class="text-start" style="word-break:break-word;" title="{{ $item['counterparty'] }}">{{ $item['counterparty'] }}</td>
+                                        <td style="word-break:break-word;">{{ $item['contract_details'] ?? '' }}</td>
+                                        <td>{{ $item['contract_validity'] ?? '' }}</td>
                                     </tr>
-                                    <tr>
-                                        <th>Обраб.</th>
-                                        <th>Утил.</th>
-                                        <th>Обезвр.</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @php $row=1; $totalRec=0; @endphp
-                                    @forelse($journal->table4_data as $index => $item)
-                                        @php $totalRec += (float)$item['amount']; @endphp
-                                        <tr>
-                                            <td class="position-relative">
-                                                <span class="row-number">{{ $loop->iteration }}</span>
-                                                <button class="btn btn-sm btn-dark text-white p-0 border-0 delete-row-btn position-absolute top-50 start-50 translate-middle"
-                                                        style="display: none; width: 24px; height: 24px; z-index: 100;"
-                                                        title="Удалить строку"
-                                                        data-table="table4_data"
-                                                        data-row="{{ $index }}">
-                                                    <i class="bi bi-trash text-white"></i>
-                                                </button>
-                                            </td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="date">{{ \Carbon\Carbon::parse($item['date'])->format('d.m.Y') }}</td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="number">{{ $item['number'] }}</td>
-                                            <td class="editable text-start" data-table="table4_data" data-row="{{ $index }}" data-column="waste">{{ $item['waste'] }}</td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="fkko">{{ $item['fkko'] }}</td>
-                                            <td data-table="table4_data" data-row="{{ $index }}" data-column="hazard">{{ $item['hazard'] }}</td>
-                                            <td class="editable text-start" data-table="table4_data" data-row="{{ $index }}" data-column="counterparty">{{ $item['counterparty'] }}</td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="amount"><strong>{{ rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') }}</strong></td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="p_process">{{ $item['p_process'] ?? (str_contains($item['operation']??'', 'обраб') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="p_util">{{ $item['p_util'] ?? (str_contains($item['operation']??'', 'утилиз') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                            <td class="editable" data-table="table4_data" data-row="{{ $index }}" data-column="p_neutr">{{ $item['p_neutr'] ?? (str_contains($item['operation']??'', 'обезвреж') ? rtrim(rtrim(number_format($item['amount'], 3), '0'), '.') : '') }}</td>
-                                        </tr>
-                                    @empty
-                                        <tr><td colspan="12">Нет данных</td></tr>
-                                    @endforelse
-                                    @if(count($journal->table4_data) > 0)
-                                        <tr class="fw-bold bg-light">
-                                            <td colspan="7" class="text-end">Итого:</td>
-                                            <td id="total-table4_data">{{ rtrim(rtrim(number_format($totalRec, 3), '0'), '.') }}</td>
-                                            <td colspan="3"></td>
-                                        </tr>
-                                    @endif
-                                </tbody>
-                             </table>
-                        </div>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
             </div>
         </div>
     </div>
-    
-    <script>
-        const wasteOptions = @json($wastes ?? []);
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const recalculateTotal = (tableName) => {
-                const totalCell = document.getElementById(`total-${tableName}`);
-                if (!totalCell) return;
-
-                let total = 0;
-                document.querySelectorAll(`td[data-table="${tableName}"][data-column="amount"]`).forEach(td => {
-                    let raw = td.innerText.replace(/,/g, '').trim(); 
-                    let val = parseFloat(raw) || 0;
-                    total += val;
-                });
-
-                let s = total.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 3});
-                
-                s = s.replace(/\.?0+$/, '');
-                totalCell.innerText = s;
-            };
-
-            const handleRowDeletion = (row, tableName) => {
-                const tableBody = row.closest('tbody');
-                row.remove();
-                
-                let rowNum = 1;
-                let dataRowIndex = 0;
-                tableBody.querySelectorAll('tr').forEach(tr => {
-                    const firstCell = tr.cells[0];
-                    if (firstCell && !firstCell.hasAttribute('colspan')) {
-                        const numSpan = firstCell.querySelector('.row-number');
-                        if (numSpan) numSpan.innerText = rowNum++;
-                        else firstCell.innerText = rowNum++;
-                        
-                        tr.querySelectorAll('[data-row]').forEach(el => {
-                            el.dataset.row = dataRowIndex;
-                        });
-                        dataRowIndex++;
-                    }
-                });
-
-                recalculateTotal(tableName);
-            };
-
-            document.body.addEventListener('click', async function(e) {
-                const btn = e.target.closest('.delete-row-btn');
-                if (!btn) return;
-
-                if (!confirm('Вы уверены, что хотите удалить эту строку?')) return;
-
-                const table = btn.dataset.table;
-                const rowIndex = btn.dataset.row;
-                const row = btn.closest('tr');
-
-                try {
-                    const response = await fetch('{{ route('journal.update', $journal->id) }}', {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            table: table,
-                            row_index: rowIndex,
-                            column: 'amount',
-                            value: 0
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error('Failed');
-                    const data = await response.json();
-
-                    if (data.action === 'deleted') {
-                        handleRowDeletion(row, table);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('Ошибка при удалении строки');
-                }
-            });
-
-            document.querySelectorAll('.editable').forEach(cell => {
-                cell.style.cursor = 'pointer';
-                cell.title = 'Нажмите для изменения';
-                
-                cell.addEventListener('click', function() {
-                    if (this.isEditing) return;
-                    this.isEditing = true;
-                    
-                    const column = this.dataset.column;
-                    const originalValue = this.innerText.trim();
-                    let input;
-
-                    if (column === 'waste') {
-                        input = document.createElement('select');
-                        input.className = 'form-select form-select-sm p-0 border-0 shadow-none bg-transparent';
-                        
-                        let found = false;
-                        wasteOptions.forEach(w => {
-                            const opt = document.createElement('option');
-                            opt.value = w.name;
-                            opt.text = w.name;
-                            if (w.name === originalValue) {
-                                opt.selected = true;
-                                found = true;
-                            }
-                            input.appendChild(opt);
-                        });
-                        
-                        if (!found && originalValue) {
-                            const opt = document.createElement('option');
-                            opt.value = originalValue;
-                            opt.text = originalValue;
-                            opt.selected = true;
-                            input.appendChild(opt);
-                        }
-                    } else if (column === 'fkko') {
-                        input = document.createElement('select');
-                        input.className = 'form-select form-select-sm p-0 border-0 shadow-none bg-transparent';
-                        
-                        let found = false;
-                        wasteOptions.forEach(w => {
-                            const opt = document.createElement('option');
-                            opt.value = w.code;
-                            opt.text = w.code;
-                            opt.title = w.name;
-                            if (w.code === originalValue) {
-                                opt.selected = true;
-                                found = true;
-                            }
-                            input.appendChild(opt);
-                        });
-                        
-                        if (!found && originalValue) {
-                            const opt = document.createElement('option');
-                            opt.value = originalValue;
-                            opt.text = originalValue;
-                            opt.selected = true;
-                            input.appendChild(opt);
-                        }
-                    } else {
-                        input = document.createElement('input');
-                        input.type = 'text';
-                        input.value = originalValue;
-                        input.className = 'form-control form-control-sm p-0 border-0 shadow-none bg-transparent';
-                        if (this.classList.contains('text-start')) {
-                            input.classList.add('text-start');
-                        } else {
-                            input.classList.add('text-center');
-                        }
-                    }
-                    
-                    input.style.width = '100%';
-                    input.style.minWidth = '50px';
-                    
-                    this.innerHTML = '';
-                    this.appendChild(input);
-                    input.focus();
-                    
-                    const save = async () => {
-                        const newValue = input.value;
-                        if (newValue === originalValue) {
-                            this.innerHTML = originalValue;
-                            this.isEditing = false;
-                            return;
-                        }
-                        
-                        try {
-                            const response = await fetch('{{ route('journal.update', $journal->id) }}', {
-                                method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                    'Accept': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    table: this.dataset.table,
-                                    row_index: this.dataset.row,
-                                    column: this.dataset.column,
-                                    value: newValue
-                                })
-                            });
-                            
-                            if (!response.ok) throw new Error('Failed');
-                            
-                            const data = await response.json();
-                            
-                            if (data.action === 'deleted') {
-                                handleRowDeletion(this.closest('tr'), this.dataset.table);
-                                return;
-                            }
-                            
-                            this.innerHTML = newValue;
-                            
-                            this.classList.add('bg-success-subtle');
-                            setTimeout(() => this.classList.remove('bg-success-subtle'), 1000);
-
-                            if (data.updates) {
-                                const row = this.closest('tr');
-                                for (const [key, val] of Object.entries(data.updates)) {
-                                    const sibling = row.querySelector(`[data-column="${key}"]`);
-                                    if (sibling) {
-                                        sibling.innerText = val;
-                                        sibling.classList.add('bg-success-subtle');
-                                        setTimeout(() => sibling.classList.remove('bg-success-subtle'), 1000);
-                                    }
-                                }
-                            }
-                            
-                            recalculateTotal(this.dataset.table);
-
-                        } catch (e) {
-                            console.error(e);
-                            this.innerHTML = originalValue;
-                            alert('Не удалось сохранить изменения');
-                        } finally {
-                            this.isEditing = false;
-                        }
-                    };
-                    
-                    input.addEventListener('blur', save);
-                    input.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            input.blur();
-                        }
-                    });
-                });
-            });
-        });
-    </script>
 @endsection

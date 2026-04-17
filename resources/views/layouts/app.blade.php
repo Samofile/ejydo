@@ -119,7 +119,7 @@
             background-color: #1f1f1f !important;
         }
     </style>
-    
+
     @stack('styles')
 
     <!-- Favicon -->
@@ -155,19 +155,28 @@
                 @auth
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('dashboard') || request()->routeIs('acts.*') ? 'active' : '' }}" 
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('dashboard') || request()->routeIs('acts.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             АКТЫ
                         </a>
                         <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('acts.archive') ? 'active' : '' }}" 
+                             <li>
+                                <a class="dropdown-item {{ request()->routeIs('acts.archive') ? 'active' : '' }}"
                                    href="{{ route('acts.archive') }}">
-                                    ВСЕ АКТЫ
+                                    РЕЕСТР АКТОВ
                                 </a>
                             </li>
+                            @foreach(\App\Models\Act::TYPES as $typeKey => $typeLabel)
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('dashboard') ? 'active' : '' }}" 
+                                <a class="dropdown-item {{ request()->routeIs('acts.manual.create') && request()->input('act_type') === $typeKey ? 'active' : '' }}"
+                                   href="{{ route('acts.manual.create', ['act_type' => $typeKey]) }}">
+                                    {{ $typeLabel }}
+                                </a>
+                            </li>
+                            @endforeach
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"
                                    href="{{ route('dashboard') }}">
                                     ЗАГРУЗИТЬ АКТ
                                 </a>
@@ -184,6 +193,23 @@
                             КОМПАНИИ
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="{{ route('counterparties.index') }}"
+                            class="nav-link {{ request()->routeIs('counterparties.*') ? 'active' : '' }}">
+                            КОНТРАГЕНТЫ
+                        </a>
+                    </li>
+                    @php
+                        $navCurrentCompany = app(\App\Services\TenantService::class)->getCompany();
+                    @endphp
+                    @if($navCurrentCompany && $navCurrentCompany->hasPolygons())
+                    <li class="nav-item">
+                        <a href="{{ route('polygons.index') }}"
+                            class="nav-link {{ request()->routeIs('polygons.*') ? 'active' : '' }}">
+                            ПОЛИГОНЫ
+                        </a>
+                    </li>
+                    @endif
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('subscription.index') ? 'active' : '' }}"
                             href="{{ route('subscription.index') }}">ТАРИФЫ</a>
@@ -316,11 +342,18 @@
                                                 html = '<p class="text-center mt-2">Ничего не найдено</p>';
                                             } else {
                                                 data.forEach(item => {
+                                                    let fCode = item.code;
+                                                    let cleanCode = (fCode || '').replace(/\s+/g, '');
+                                                    if (cleanCode.length === 11) {
+                                                        fCode = cleanCode.substring(0,1) + ' ' + cleanCode.substring(1,3) + ' ' + 
+                                                                cleanCode.substring(3,6) + ' ' + cleanCode.substring(6,8) + ' ' + 
+                                                                cleanCode.substring(8,10) + ' ' + cleanCode.substring(10,11);
+                                                    }
                                                     html += `
                                                                                                 <div class="mb-2 border-bottom pb-1" title="${item.name}"
                                                                                                      style="cursor: pointer;"
                                                                                                      onclick="window.location.href='{{ route('acts.manual.create') }}?fkko_code=${item.code}'">
-                                                                                                    <div class="fw-bold text-dark">${item.code}</div>
+                                                                                                    <div class="fw-bold text-dark">${fCode}</div>
                                                                                                     <div class="text-truncate">${item.name}</div>
                                                                                                 </div>
                                                                                             `;
@@ -396,7 +429,7 @@
             </div>
             <div class="row mt-4 pt-3 border-top border-secondary">
                 <div class="col-12 text-center text-white small">
-                    <p class="mb-0">© 2026 ejydo.ru. ИНН 272336634478 ОГРНИП 325270000036421</p>
+                    <p class="mb-0">© {{ date('Y') }} ejydo.ru. ИНН 272336634478 ОГРНИП 325270000036421</p>
                 </div>
             </div>
         </div>

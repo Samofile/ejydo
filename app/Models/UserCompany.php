@@ -22,6 +22,8 @@ class UserCompany extends Model
         'email',
         'is_active',
         'subscription_expires_at',
+        'license_details',
+        'license_valid_until',
     ];
 
     protected $casts = [
@@ -58,5 +60,24 @@ class UserCompany extends Model
     {
         $prefix = ($this->type === 'ip') ? 'Индивидуальный предприниматель' : 'Общество с ограниченной ответственностью';
         return "{$prefix} \"{$this->name}\"";
+    }
+
+    public function polygons(): HasMany
+    {
+        return $this->hasMany(Polygon::class, 'company_id');
+    }
+
+    public function hasPolygons(): bool
+    {
+        return $this->polygons()->exists();
+    }
+
+    public function getDefaultJournalScope(): int|array
+    {
+        if ($this->hasPolygons()) {
+            return $this->polygons()->pluck('id')->toArray();
+        }
+
+        return $this->id;
     }
 }
